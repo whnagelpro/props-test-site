@@ -3,11 +3,11 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import date
-import json  # Added for parsing Teams JSON
+import json
 
-# --- Connect to your Google Sheet ---
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+# Load credentials from Streamlit secrets (added in Cloud settings)
+creds_dict = json.loads(st.secrets["google_credentials"])
+creds = ServiceAccountCredentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
 # Sheet IDs for each league
