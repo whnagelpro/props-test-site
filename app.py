@@ -6,8 +6,7 @@ from datetime import date
 import json
 
 # Load credentials from Streamlit secrets (no json.loads needed!)
-creds_dict = st.secrets["google_credentials"]
-creds = ServiceAccountCredentials.from_service_account_info(creds_dict, scopes=scope)
+creds = ServiceAccountCredentials.from_service_account_info(st.secrets["google_credentials"], scopes=scope)
 client = gspread.authorize(creds)
 
 # Sheet IDs for each league
