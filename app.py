@@ -1,10 +1,9 @@
 import streamlit as st
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import date
 import json
-from google.oauth2.service_account import Credentials
 
 # Load credentials from Streamlit secrets
 creds = Credentials.from_service_account_info(
