@@ -5,8 +5,11 @@ import pandas as pd
 from datetime import date
 import json
 
+# Define the scope (this was missing/moved)
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
 # Load credentials from Streamlit secrets
-creds = Credentials.from_service_account_info(
+creds = ServiceAccountCredentials.from_service_account_info(
     st.secrets["google_credentials"],
     scopes=scope
 )
