@@ -4,9 +4,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import date
 import json
+from google.oauth2.service_account import Credentials
 
-# Load credentials from Streamlit secrets (no json.loads needed!)
-creds = ServiceAccountCredentials.from_service_account_info(st.secrets["google_credentials"], scopes=scope)
+# Load credentials from Streamlit secrets
+creds = Credentials.from_service_account_info(
+    st.secrets["google_credentials"],
+    scopes=scope
+)
 client = gspread.authorize(creds)
 
 # Sheet IDs for each league
