@@ -5,8 +5,8 @@ import pandas as pd
 from datetime import date
 import json
 
-# Load credentials from Streamlit secrets (added in Cloud settings)
-creds_dict = json.loads(st.secrets["google_credentials"])
+# Load credentials from Streamlit secrets (no json.loads needed!)
+creds_dict = st.secrets["google_credentials"]
 creds = ServiceAccountCredentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
