@@ -1,20 +1,16 @@
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials  # <-- Modern import
+from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import date
 import json
 
-# Define the scope (required for gspread authorization)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-creds = Credentials.from_service_account_info(
-    st.secrets["google_credentials"],
-    scopes=scope
-)
+creds_dict = json.loads(st.secrets["google_credentials"])
+creds = ServiceAccountCredentials.from_service_account_info(creds_dict, scopes=scope)
 client = gspread.authorize(creds)
 
-# Sheet IDs for each league
 sheet_ids = {
     "NBA": "1LQDFrmsT2lCHqrvX2V0P8cgQ0wai_GhZLn0aCpeB-Kk",
     "NHL": "1iQPpjGlSlnCWZieBFSxWdv4a_vmoHqLtnVKA86BkLfk",
@@ -24,12 +20,10 @@ sheet_ids = {
 
 st.title("Props Test Website – Big 4 Leagues")
 
-# Sidebar: League and page only (no tier here)
 st.sidebar.title("Menu")
 league = st.sidebar.selectbox("League", ["NHL", "NBA", "NFL", "MLB"])
 page = st.sidebar.selectbox("Go to page", ["Rosters", "Schedules", "Props & Odds"])
 
-# Load the correct sheet for the league
 if league not in sheet_ids or not sheet_ids[league]:
     st.error(f"No sheet ID configured for {league}. Add it to the sheet_ids dictionary.")
     st.stop()
@@ -40,7 +34,6 @@ except gspread.exceptions.SpreadsheetNotFound:
     st.error(f"Sheet ID '{sheet_id}' not found. Double-check the ID for {league}.")
     st.stop()
 
-# Load tabs (exact names that worked before)
 roster_tab = "Rosters"
 schedules_tab = "Schedule"
 
@@ -63,7 +56,6 @@ if page == "Rosters":
                     seen[h] = 1
             df = pd.DataFrame(data[start_row + 1:], columns=headers)
         
-            # Team filter dropdown on main page
             possible_team_cols = ['Name', 'Full Name', 'Abbreviation', 'Team', 'City', 'Teams']
             team_col = next((col for col in possible_team_cols if col in df.columns), None)
             if team_col:
@@ -71,15 +63,13 @@ if page == "Rosters":
                     if not team_str or team_str.strip() == '':
                         return None
                     try:
-                        # Parse JSON-like string (e.g. "[{\"full_name\":\"Montréal Canadiens\"...}]")
                         teams_list = json.loads(team_str.replace("'", "\""))
                         if isinstance(teams_list, list) and len(teams_list) > 0:
                             return teams_list[0].get('full_name', None)
                     except:
                         pass
-                    return team_str # Fallback if not JSON
-             
-                # Apply extraction and clean
+                    return team_str
+            
                 teams_series = df[team_col].apply(extract_team).dropna().astype(str).str.strip()
                 teams_series = teams_series[~teams_series.str.lower().isin(['', 'name', 'team', 'nan'])]
                 teams = ["All Teams"] + sorted(teams_series.unique().tolist())
@@ -130,13 +120,13 @@ elif page == "Schedules":
                 years = sorted(set(d.year for d in unique_dates))
                 months = sorted(set(d.month for d in unique_dates))
                 days = sorted(set(d.day for d in unique_dates))
-             
+            
                 selected_year = st.selectbox("Year", [int(y) for y in years])
                 filtered_months = sorted(set(d.month for d in unique_dates if d.year == selected_year))
                 selected_month = st.selectbox("Month", [int(m) for m in filtered_months])
                 filtered_days = sorted(set(d.day for d in unique_dates if d.year == selected_year and d.month == selected_month))
                 selected_day = st.selectbox("Day", [int(d) for d in filtered_days])
-             
+            
                 try:
                     selected_date = date(selected_year, selected_month, selected_day)
                     df_filtered = df[df[date_col].dt.date == selected_date]
@@ -165,12 +155,11 @@ elif page == "Props & Odds":
     tier = st.selectbox("Your Subscription Tier", ["Rookie", "Veteran", "All-Star", "Hall-of-Famer", "Legend"])
     tier_limits = {"Rookie": 5, "Veteran": 15, "All-Star": 25, "Hall-of-Famer": 50, "Legend": 999}
     try:
-        # Dynamically list all tabs in the sheet
-        all_tabs = [ws.title for ws in sheet.worksheets() if "Props & Odds" in ws.title]  # Filter to only props tabs
+        all_tabs = [ws.title for ws in sheet.worksheets() if "Props & Odds" in ws.title]
         if not all_tabs:
             st.info(f"No Props & Odds tabs found in {league} sheet. Check tab names.")
         else:
-            selected_tab = st.selectbox("Select Game Tab", all_tabs)  # Shows all tabs, even "shut off" ones
+            selected_tab = st.selectbox("Select Game Tab", all_tabs)
             tab = sheet.worksheet(selected_tab)
             data = tab.get_all_values()
             if len(data) > 0:
@@ -186,26 +175,63 @@ elif page == "Props & Odds":
                     else:
                         seen[h] = 1
                 df = pd.DataFrame(data[start_row + 1:], columns=headers)
-         
-                # Remove empty rows
+        
                 df = df.dropna(how='all')
                 df = df[~df.apply(lambda row: row.astype(str).str.strip().eq('').all(), axis=1)]
-         
-                # Sort by Poisson % if present (optional - keeping your original behavior)
+        
                 poisson_col = next((col for col in df.columns if 'poisson' in col.lower()), None)
                 if poisson_col:
                     df[poisson_col] = pd.to_numeric(df[poisson_col], errors='coerce')
                     df = df.sort_values(by=poisson_col, ascending=False)
-           
+          
                 top_n = tier_limits[tier]
                 best = df.head(top_n)
-           
+          
                 st.dataframe(
                     best,
                     use_container_width=True,
                     column_config={col: st.column_config.Column(width="large") for col in best.columns}
                 )
                 st.write(f"Your tier ({tier}) shows the top {top_n} best props for {selected_tab} (out of {len(df)} valid rows).")
+
+                # NEW: Player ID to Player Name Converter
+                if league == "NBA":
+                    st.header("Player ID to Player Name Converter")
+                    st.write("Type a Player ID to see the player's name (from NBA Rosters tab).")
+                    try:
+                        roster_tab = sheet.worksheet("Rosters")
+                        roster_data = roster_tab.get_all_values()
+                        if len(roster_data) > 0:
+                            roster_start_row = 0
+                            if roster_data[0][0].lower().startswith("api key") or not roster_data[0][0].strip():
+                                roster_start_row = 1
+                            roster_headers = roster_data[roster_start_row]
+                            roster_df = pd.DataFrame(roster_data[roster_start_row + 1:], columns=roster_headers)
+                            
+                            # Assume columns: 'id' for Player ID, 'first_name', 'last_name'
+                            if 'id' in roster_df.columns and 'first_name' in roster_df.columns and 'last_name' in roster_df.columns:
+                                roster_df['id'] = pd.to_numeric(roster_df['id'], errors='coerce')
+                                roster_df['full_name'] = roster_df['first_name'] + " " + roster_df['last_name']
+                                id_to_name = dict(zip(roster_df['id'], roster_df['full_name']))
+                                
+                                # User inputs Player ID
+                                player_id = st.text_input("Enter Player ID", value="", help="Type a numeric Player ID and press Enter to see the name.")
+                                if player_id:
+                                    try:
+                                        player_id = int(player_id)
+                                        player_name = id_to_name.get(player_id, "Player ID not found in Rosters.")
+                                        st.write(f"Player Name: **{player_name}**")
+                                    except ValueError:
+                                        st.warning("Please enter a valid numeric Player ID.")
+                            else:
+                                st.warning("Rosters tab missing required columns: id, first_name, last_name.")
+                        else:
+                            st.warning("No data in Rosters tab.")
+                    except gspread.exceptions.WorksheetNotFound:
+                        st.error("Rosters tab not found in NBA sheet.")
+                    except Exception as e:
+                        st.error(f"Error loading Player Converter: {str(e)}")
+
             else:
                 st.warning(f"No data in '{selected_tab}' tab.")
     except gspread.exceptions.WorksheetNotFound:
