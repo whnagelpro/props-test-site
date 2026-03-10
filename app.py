@@ -166,7 +166,7 @@ elif page == "Props & Odds":
     try:
         all_tabs = [ws.title for ws in sheet.worksheets() if "Props & Odds" in ws.title]
         if not all_tabs:
-            st.info(f"No Props & Odds tabs found in {league} sheet.")
+            st.info(f"No Props & Odds tabs found in {league} sheet. Check tab names.")
         else:
             selected_tab = st.selectbox("Select Game Tab", all_tabs)
             tab = sheet.worksheet(selected_tab)
@@ -196,17 +196,10 @@ elif page == "Props & Odds":
                 top_n = tier_limits[tier]
                 best = df.head(top_n)
           
-                st.dataframe(
-                    best,
-                    use_container_width=True,
-                    column_config={col: st.column_config.Column(width="large") for col in best.columns}
-                )
-                st.write(f"Your tier ({tier}) shows the top {top_n} best props for {selected_tab} (out of {len(df)} valid rows).")
-
-                # === Player ID to Name Converter ===
+                # === Player ID to Name Converter (moved ABOVE the table) ===
                 if league == "NBA":
-                    st.subheader("Player ID to Player Name Converter")
-                    st.caption("Type a Player ID to instantly see the player's name (from NBA Rosters tab).")
+                    st.subheader("Player ID to Name Converter")
+                    st.caption("Type a numeric Player ID below to instantly see the player's full name (from NBA Rosters tab).")
 
                     try:
                         roster_tab = sheet.worksheet("Rosters")
@@ -226,7 +219,7 @@ elif page == "Props & Odds":
                             last_col = next((c for c in roster_df.columns if 'last' in c), None)
 
                             if id_col and first_col and last_col:
-                                # Clean ID column to numeric
+                                # Clean ID column to numeric (skip rows with non-numeric IDs)
                                 roster_df[id_col] = pd.to_numeric(roster_df[id_col], errors='coerce')
                                 roster_df = roster_df.dropna(subset=[id_col])
                                 roster_df[id_col] = roster_df[id_col].astype(int)
@@ -235,9 +228,9 @@ elif page == "Props & Odds":
                                 roster_df['full_name'] = roster_df[first_col].astype(str) + " " + roster_df[last_col].astype(str)
                                 id_to_name = dict(zip(roster_df[id_col], roster_df['full_name']))
 
-                                # User input
-                                player_id_input = st.text_input("Enter Player ID", key="player_id_input", help="Type a numeric ID and press Enter.")
-                                if player_id_input:
+                                # User input (simple text box)
+                                player_id_input = st.text_input("Enter Player ID", value="", help="Type a numeric ID and press Enter.")
+                                if player_id_input.strip():
                                     try:
                                         player_id = int(player_id_input.strip())
                                         player_name = id_to_name.get(player_id, "ID not found in NBA Rosters.")
@@ -252,6 +245,14 @@ elif page == "Props & Odds":
                         st.error("Rosters tab not found in NBA sheet.")
                     except Exception as e:
                         st.error(f"Error loading converter: {str(e)}")
+
+                # === Props Table (below the converter) ===
+                st.dataframe(
+                    best,
+                    use_container_width=True,
+                    column_config={col: st.column_config.Column(width="large") for col in best.columns}
+                )
+                st.write(f"Your tier ({tier}) shows the top {top_n} best props for {selected_tab} (out of {len(df)} valid rows).")
             else:
                 st.warning(f"No data in '{selected_tab}' tab.")
     except gspread.exceptions.WorksheetNotFound:
