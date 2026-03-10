@@ -5,10 +5,14 @@ import pandas as pd
 from datetime import date
 import json
 
+# Define scope (must come before creds)
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-creds_dict = json.loads(st.secrets["google_credentials"])
-creds = ServiceAccountCredentials.from_service_account_info(creds_dict, scopes=scope)
+# Load from Streamlit secrets (no json.loads needed)
+creds = Credentials.from_service_account_info(
+    st.secrets["google_credentials"],
+    scopes=scope
+)
 client = gspread.authorize(creds)
 
 sheet_ids = {
